@@ -53,9 +53,29 @@ target_link_libraries(YourTarget
 ```cpp
 #include <dynswap.h>
 
+#include <dlfcn.h>
+#include <libgen.h>
+#include <string>
+
 extern "C" jint JNI_OnLoad(JavaVM *vm, void *reserved)
 {
-    dynswap::try_load(vm, "/data/app/.../libil2cpp.so");
+    Dl_info dlInfo{};
+    if (!dladdr(reinterpret_cast<void *>(JNI_OnLoad), &dlInfo))
+        return JNI_VERSION_1_6;
+
+    // 1) If we are inside swap, dynswap already stored original lib path in env.
+    // 2) If not, fallback to current-dir/libil2cpp.so.
+    std::string libFullPath = dynswap::get_library_path();
+    if (libFullPath.empty())
+    {
+        std::string currentDir = dirname(dlInfo.dli_fname);
+        libFullPath = currentDir + "/libil2cpp.so";
+    }
+
+    if (dynswap::try_load(vm, libFullPath.c_str()))
+        return JNI_VERSION_1_6;
+
+    // continue normal init using libFullPath
     return JNI_VERSION_1_6;
 }
 ```
@@ -72,8 +92,10 @@ Config namespace:
 - `const char *dynswap::config::env_var_name();`
 - `const char *dynswap::config::swap_active_env_var_name();`
 
+
 ## Troubleshooting
 
 - Verify swap file exists at configured path.
 - Verify ABI matches target process.
 - Check logs for `DSWAP_ACTIVE` guard behavior.
+- If you see `/data/local/tmp/libil2cpp.so` in logs, your caller is not using `dynswap::get_library_path()` first.
