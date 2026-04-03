@@ -21,6 +21,13 @@ namespace dynswap
          * @return A constant character pointer to the environment variable name.
          */
         const char *env_var_name();
+
+        /**
+         * Retrieves the name of the environment variable used as swap-active guard.
+         *
+         * @return A constant character pointer to the guard environment variable name.
+         */
+        const char *swap_active_env_var_name();
     } // namespace config
 
     /**

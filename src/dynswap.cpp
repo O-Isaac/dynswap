@@ -6,18 +6,12 @@
 
 namespace dynswap
 {
-    constexpr const char *kSwapActiveEnv = "DSWAP_ACTIVE";
-
-    namespace
-    {
-    const char *kLegacySwapPath = "/data/local/tmp/libAvalonHook.so";
-    }
-
     // Forward declarations
     namespace config
     {
         const char *swap_lib_path();
         const char *env_var_name();
+        const char *swap_active_env_var_name();
     }
 
     namespace env
@@ -34,7 +28,9 @@ namespace dynswap
     // Core function implementations
     bool try_load(JavaVM *vm, const char *libPath)
     {
-        const char *swapActive = std::getenv(kSwapActiveEnv);
+        const char *swapActiveEnv = config::swap_active_env_var_name();
+        const char *swapActive = std::getenv(swapActiveEnv);
+        
         if (swapActive && std::strcmp(swapActive, "1") == 0)
         {
             LOGI("Dynswap already active in this process. Skipping recursive load.");
@@ -45,16 +41,8 @@ namespace dynswap
 
         if (!file_exists(swapPath))
         {
-            if (file_exists(kLegacySwapPath))
-            {
-                LOGI("Primary swap path missing, falling back to legacy path: %s", kLegacySwapPath);
-                swapPath = kLegacySwapPath;
-            }
-            else
-            {
-                LOGI("No swap library found at %s. Skipping load.", swapPath);
-                return false;
-            }
+            LOGI("No swap library found at configured path: %s. Skipping load.", swapPath);
+            return false;
         }
 
         LOGI("Swap library found at %s. Preparing to load.", swapPath);
@@ -65,10 +53,12 @@ namespace dynswap
             LOGI("Original libil2cpp.so path saved to env: %s", libPath);
         }
 
-        setenv(kSwapActiveEnv, "1", 1);
+        setenv(swapActiveEnv, "1", 1);
         const bool loaded = loader::load_and_call_jni_onload(vm, swapPath);
+
         if (!loaded)
-            unsetenv(kSwapActiveEnv);
+            unsetenv(swapActiveEnv);
+
         return loaded;
     }
 
